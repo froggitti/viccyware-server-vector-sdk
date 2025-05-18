@@ -1,36 +1,11 @@
 #!/usr/bin/env python3
 
-"""
-***Anki Vector Python SDK Setup***
-
-Vector requires all requests be authorized by an authenticated Anki user.
-
-This script will enable this device to authenticate with your Vector
-robot for use with a Vector Python SDK program.
-
-Vector must be powered on and connected on the same network as your
-computer. By running this script, you will be asked to provide your
-Anki account credentials, and the script will download an authentication
-token and cert that will grant you access to the robot and his
-capabilities (such as camera and audio) as well as data stored on the
-robot (such as faces and photos).
-
-See the README for more information.
-
-Use of Vector and the Vector SDK is subject to Anki's Privacy Policy and Terms and Conditions.
-
-https://www.anki.com/en-us/company/privacy
-https://www.anki.com/en-us/company/terms-and-conditions
-
-"""
-
 import argparse
 import configparser
 from getpass import getpass
 import json
 import os
 from pathlib import Path
-import platform
 import re
 import socket
 import sys
@@ -67,18 +42,15 @@ class Api:
     def __init__(self):
         self._handler = ApiHandler(
             headers={
-                'User-Agent': 'Vector-sdk/{} {}/{}'.format(anki_vector.__version__,
-                                                           platform.python_implementation(),
-                                                           platform.python_version()),
-
-                'Anki-App-Key': 'aung2ieCho3aiph7Een3Ei'
+                'User-Agent': f'Vector-sdk/{anki_vector.__version__}',
+                'Anki-App-Key': 'oDoa0quieSeir6goowai7f'
             },
-            url='https://accounts.api.anki.com/1/sessions'
+            url='https://api.vicw.xyz:6060/v1/sessions'
         )
 
     @property
     def name(self):
-        return "Anki Cloud"
+        return "Stratus"
 
     @property
     def handler(self):
@@ -99,14 +71,10 @@ def get_serial(serial=None):
 
 
 def get_cert(serial=None):
-    print("\n\nEnter the IP address and webserver port of your wire-pod instance (ex. 192.168.1.50:8080) (:8080 is the default port)\nLeave this blank and press enter if you want this script to attempt to automatically connect to your wire-pod instance via escapepod.local.")
-    podip = input("Enter wire-pod ip: ")
-    if podip == "":
-        podip = "escapepod.local:8080"
     serial = get_serial(serial)
-    print("\nDownloading Vector certificate from wire-pod...", end="")
+    print("\nDownloading Vector certificate from the Viccyware server...", end="")
     sys.stdout.flush()
-    r = requests.get('http://{}/session-certs/{}'.format(podip, serial))
+    r = requests.get('https://api.vicw.xyz:6060/v1/session_cert/{}'.format(serial))
     if r.status_code != 200:
         print(colored(" ERROR", "red"))
         sys.exit(r.content)
@@ -119,9 +87,9 @@ def user_authentication(session_id: bytes, cert: bytes, ip: str, name: str) -> s
     # Pin the robot certificate for opening the channel
     creds = grpc.ssl_channel_credentials(root_certificates=cert)
 
-    print("Attempting to download guid from {} at {}:443...".format(colored(name, "cyan"), colored(ip, "cyan")), end="")
+    print("Attempting to download guid from {} at {}:8081...".format(colored(name, "cyan"), colored(ip, "cyan")), end="")
     sys.stdout.flush()
-    channel = grpc.secure_channel("{}:443".format(ip), creds,
+    channel = grpc.secure_channel("{}:8081".format(ip), creds,
                                   options=(("grpc.ssl_target_name_override", name,),))
 
     # Verify the connection to Vector is able to be established (client-side)
@@ -131,7 +99,7 @@ def user_authentication(session_id: bytes, cert: bytes, ip: str, name: str) -> s
     except grpc.FutureTimeoutError:
         print(colored(" ERROR", "red"))
         sys.exit("\nUnable to connect to Vector\n"
-                 "Please be sure to connect via the Vector companion app first, and connect your computer to the same network as your Vector.")
+                 "Please be sure to connect via https://v.vicw.xyz first, and connect your computer to the same network as your Vector.")
 
     try:
         interface = messaging.client.ExternalInterfaceStub(channel)
@@ -142,7 +110,7 @@ def user_authentication(session_id: bytes, cert: bytes, ip: str, name: str) -> s
         if response.code != messaging.protocol.UserAuthenticationResponse.AUTHORIZED:  # pylint: disable=no-member
             print(colored(" ERROR", "red"))
             sys.exit("\nFailed to authorize request:\n"
-                     "Please be sure to first set up Vector using the companion app.")
+                     "Please be sure to first set up Vector using https://v.vicw.xyz.")
     except grpc.RpcError as e:
         print(colored(" ERROR", "red"))
         sys.exit("\nFailed to authorize request:\n"
@@ -153,7 +121,7 @@ def user_authentication(session_id: bytes, cert: bytes, ip: str, name: str) -> s
 
 
 def get_session_token(api, username=None):
-    print("Enter your email and password. Make sure to use the same account that was used to set up your Vector.")
+    print("Enter your Viccyware email and password.")
     if not username:
         username = input("Enter Email: ")
     else:
@@ -199,7 +167,7 @@ def get_name_and_ip(robot_name=None, ip=None):
         ip = os.environ.get('ANKI_ROBOT_HOST')
         if not ip:
             print("\n\nFind your robot ip address (ex. 192.168.42.42) by placing Vector on the charger, double-clicking Vector's backpack button,\n"
-                  "then raising and lowering his arms. If you see {} on his face, reconnect Vector to your WiFi using the Vector Companion App.".format(colored("XX.XX.XX.XX", "red")))
+                  "then raising and lowering his arms. If you see {} on his face, reconnect Vector to your WiFi using https://vector-setup.ddl.io/".format(colored("XX.XX.XX.XX", "red")))
             ip = input("Enter robot ip: ")
         else:
             print("Found robot ip address in environment variable '{}'".format(colored("ANKI_ROBOT_HOST", "green")))
@@ -272,20 +240,20 @@ def write_config(serial, cert_file=None, ip=None, name=None, guid=None, clear=Tr
 
 
 def main(api):
-    parser = argparse.ArgumentParser(description=("Vector requires all requests be authorized by an authenticated Anki user. "
+    parser = argparse.ArgumentParser(description=("Vector requires all requests be authorized. "
                                                   "This script will enable this device to authenticate with your Vector "
                                                   "robot for use with a Vector Python SDK program."),
                                      epilog=("See the README for more information. "
-                                             "Use of Vector and the Vector SDK is subject to Anki's Privacy Policy and Terms and Conditions. "
-                                             "https://www.anki.com/en-us/company/privacy and "
-                                             "https://www.anki.com/en-us/company/terms-and-conditions"))
-    parser.add_argument("-e", "--email", help="The email used by your Anki account.")
+                                             "Use of Vector and the Vector SDK is subject to Anki's Privacy Policy and Terms of Service. "
+                                             "https://anki.bot/policies/privacy-policy and "
+                                             "https://anki.bot/policies/terms-of-service"))
+    parser.add_argument("-e", "--email", help="The email used by your Viccyware account.")
     parser.add_argument("-i", "--ip", help=("Your robot ip address (ex. 192.168.42.42). "
                                             "It may be found by placing Vector on the charger, "
                                             "double-clicking Vector's backpack button, "
                                             "then raising and lowering his arms. "
                                             "If you see {} on his face, "
-                                            "reconnect Vector to your WiFi using the Vector Companion App.".format(colored("XX.XX.XX.XX", "red"))))
+                                            "reconnect Vector to your WiFi using https://v.vicw.xyz.".format(colored("XX.XX.XX.XX", "red"))))
     parser.add_argument("-n", "--name", help=("Your robot name (ex. Vector-A1B2). "
                                               "It may be found by placing Vector on the charger and double-clicking Vector's backpack button."))
     parser.add_argument("-s", "--serial", help=("Your robot serial number (ex. 00e20100). "
@@ -315,12 +283,11 @@ def main(api):
     cert_file = save_cert(cert, name, serial, anki_dir)
     validate_cert_name(cert_file, name)
 
-    # token = get_session_token(api, args.email)
-    # if not token.get("session"):
-    #     sys.exit("Session error: {}".format(token))
-    token = "2vMhFgktH3Jrbemm2WHkfGN"
+    token = get_session_token(api, args.email)
+    if not token.get("session"):
+        sys.exit("Session error: {}".format(token))
 
-    guid = user_authentication(token, cert, ip, name)
+    guid = user_authentication(token["session"]["session_token"], cert, ip, name)
 
     # Store credentials in the .anki_vector directory's sdk_config.ini file
     write_config(serial, cert_file, ip, name, guid)
