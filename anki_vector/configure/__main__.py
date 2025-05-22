@@ -61,7 +61,7 @@ def get_serial(serial=None):
     if not serial:
         serial = os.environ.get('ANKI_ROBOT_SERIAL')
         if not serial:
-            print("\n\nPlease find your robot serial number (ex. 00e20100) located on the underside of Vector, or accessible from Vector's debug screen.")
+            print("\n\nPlease find your robot serial number (ex. 0dd1c7ef) located on the underside of Vector, or accessible from Vector's debug screen.")
             serial = input('Enter robot serial number: ')
         else:
             print("Found robot serial number in environment variable '{}'".format(colored("ANKI_ROBOT_SERIAL", "green")))
@@ -74,7 +74,7 @@ def get_cert(serial=None):
     serial = get_serial(serial)
     print("\nDownloading Vector certificate from the Viccyware server...", end="")
     sys.stdout.flush()
-    r = requests.get('https://api.vicw.xyz:6060/v1/session_cert/{}'.format(serial))
+    r = requests.get('https://api.vicw.xyz:6060/v1/session_cert/Vector-{}(robot_name).format_{}'.format(serial))
     if r.status_code != 200:
         print(colored(" ERROR", "red"))
         sys.exit(r.content)
